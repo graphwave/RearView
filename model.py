@@ -5,64 +5,6 @@ import dgl.function as fn
 import dgl
 import math
 
-
-class SAGELayer2(nn.Module):
-    def __init__(self, ndim_in, edims, ndim_out, activation):
-      super(SAGELayer, self).__init__()
-      #self.W_apply = nn.Linear(ndim_in + edims , ndim_out)
-      #self.W_node = nn.Linear(ndim_in + edims * 2, ndim_out)
-      self.W_node = nn.Linear(ndim_in*2, ndim_out)
-      self.activation = F.relu
-      #self.W_edge = nn.Linear(128 * 2, 256)
-      #self.W_edge = nn.Linear(128 * 2+edims, 256)
-      self.W_edge = nn.Linear(ndim_out+edims, 64)
-      #self.W_edge = nn.Linear(ndim_out, 256)#
-      self.reset_parameters()
-
-    def reset_parameters(self):
-      gain = nn.init.calculate_gain('relu')
-      nn.init.xavier_uniform_(self.W_node.weight, gain=gain)
-      nn.init.xavier_uniform_(self.W_edge.weight, gain=gain)
-
-    def message_func(self, edges):
-      return {'m':  edges.data['h']}
-
-    def forward(self, g_dgl, nfeats, efeats):
-      with g_dgl.local_scope():
-        g = g_dgl
-        g.ndata['h'] = nfeats
-        g.edata['h'] = efeats
-        #g.update_all(self.message_func, fn.mean('m', 'h_neigh'))
-
-        g.update_all(self.message_func, fn.mean('m', 'h_out_neigh'))
-        
-        #g.ndata['h'] = F.relu(self.W_apply(torch.cat([g.ndata['h'], g.ndata['h_neigh']], 2)))#
-        
-
-
-        g_in = dgl.reverse(g, copy_edata=True) 
-        g_in.update_all(
-            message_func=lambda edges: {'m_in': edges.data['h']},
-            reduce_func=fn.mean('m_in', 'h_in_neigh')
-        )
-
-        g.ndata['h_in_neigh'] = g_in.ndata['h_in_neigh']
-        g.ndata['h'] = self.activation(self.W_node(
-                torch.cat([g.ndata['h_out_neigh'], g.ndata['h_in_neigh']], dim=2)
-                #torch.cat([g.ndata['h'], g.ndata['h_in_neigh']], dim=2)
-                #g.ndata['h_in_neigh']
-            ))
-        # Compute edge embeddings
-        u, v = g.edges()
-        #edge = self.W_edge(torch.cat((g.srcdata['h'][u], g.dstdata['h'][v]), 2))
-        #edge = self.W_edge(torch.cat((g.srcdata['h'][u], g.dstdata['h'][v], efeats), 2))
-        edge_features = torch.cat(( g.ndata['h'][u], efeats), dim=2) 
-
-        edge = self.W_edge(edge_features)
-        return g.ndata['h'], edge
-
-
-
 class SAGELayer(nn.Module):
     def __init__(self, ndim_in, edims, ndim_out, activation):
         super(SAGELayer, self).__init__()
@@ -171,32 +113,6 @@ class Discriminator1(nn.Module):
     def forward(self, features, summary):
       features = torch.matmul(features, torch.matmul(self.weight, summary))
       return features
-
-class Discriminator(nn.Module):
-    def __init__(self, n_hidden):
-        super(Discriminator, self).__init__()
-        self.weight = nn.Parameter(torch.Tensor(n_hidden, n_hidden))
-        self.reset_parameters()
-        self.activation = nn.Sigmoid() 
-
-    def uniform(self, size, tensor):
-        bound = 1.0 / math.sqrt(size)
-        if tensor is not None:
-            tensor.data.uniform_(-bound, bound)
-
-    def reset_parameters(self):
-        size = self.weight.size(0)
-        self.uniform(size, self.weight)
-
-    def forward(self, features, summary):
-
-        batch_size = features.shape[0]
-        scores = torch.zeros(batch_size, device=features.device)
-        for i in range(batch_size):
-
-            scores[i] = torch.matmul(features[i], torch.matmul(self.weight, summary[i]))
-
-        return scores 
 
 
 class DGI(nn.Module):
