@@ -89,45 +89,7 @@ class VAE(nn.Module):
         mu, logvar = self.encode(x)
         z = self.reparameterize(mu, logvar)
         return self.decode(z), mu, logvar
-'''
-class VAE(nn.Module):
-    def __init__(self, input_dim, hidden_dim, latent_dim):
-        super(VAE, self).__init__()
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.attention = nn.Linear(hidden_dim, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, latent_dim * 2)
-        self.fc3 = nn.Linear(latent_dim, hidden_dim)
-        self.fc4 = nn.Linear(hidden_dim, input_dim)
-        self.latent_dim = latent_dim
-        
 
-        self.min_logvar = -10 
-        self.max_logvar = 10  
-
-    def encode(self, x):
-        h1 = torch.relu(self.fc1(x))
-        attn_weights = torch.sigmoid(self.attention(h1))
-        h1 = h1 * attn_weights
-        return self.fc2(h1)
-
-    def reparameterize(self, mu, logvar):
-
-        logvar = torch.clamp(logvar, self.min_logvar, self.max_logvar)
-        std = torch.exp(0.5 * logvar)
-        eps = torch.randn_like(std)
-        return mu + eps * std
-
-    def decode(self, z):
-        h3 = torch.relu(self.fc3(z))
-
-        return torch.sigmoid(self.fc4(h3)) 
-
-    def forward(self, x):
-        mu_logvar = self.encode(x).chunk(2, dim=1)
-        mu, logvar = mu_logvar
-        z = self.reparameterize(mu, logvar)
-        return self.decode(z), mu, logvar
-'''
 def vae_loss(recon_x, x, mu, logvar, beta=1.0, sparsity_weight=0.001):
 
     MSE = nn.functional.mse_loss(recon_x, x, reduction='sum')
@@ -260,29 +222,6 @@ def calculate_threshold_with_kde(model, data_loader, device, bandwidth_recon=0.1
         }
     }
 
-'''
-def calculate_threshold(model, data_loader, device):
-    model.eval()
-    all_recon_errors = []
-    all_latent_norms = []
-    with torch.no_grad():
-        for data, _ in data_loader:
-            data = data.to(device)
-            recon_batch, mu, logvar = model(data)
-            #recon_batch = model(data)
-
-            recon_error = torch.mean((recon_batch - data) ** 2, dim=1)
-            all_recon_errors.extend(recon_error.cpu().numpy())
-            
-
-            latent_norm = torch.norm(mu, dim=1)
-            all_latent_norms.extend(latent_norm.cpu().numpy())
-    
-
-    recon_threshold = np.quantile(all_recon_errors, 0.95)
-    latent_threshold = np.quantile(all_latent_norms, 0.95)
-    return recon_threshold,latent_threshold
-'''
 
 def detect_anomalies(model, data_loader, device, threshold):
     model.to(device) 
